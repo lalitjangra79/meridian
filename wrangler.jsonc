@@ -16,10 +16,5 @@
       "migrations_dir": "migrations"
     }
   ],
-  "vars": {
-    // Local dev only: the FastAPI ML engine (services/ml). In production set this
-    // as a Worker variable pointing at the deployed service.
-    "ML_SERVICE_URL": "http://127.0.0.1:8000"
-  },
   "observability": { "enabled": true }
 }

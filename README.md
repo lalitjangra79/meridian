@@ -101,8 +101,9 @@ Data engine — D1 (SQL, migrations/)                    PostgreSQL | SQLite + M
 
 The ML engine is a FastAPI service; see `services/ml/README.md`. It is not part of
 the static deploy — Freebuff Sites runs the Worker, not Python — so run it
-separately and point `ML_SERVICE_URL` at it. Without that variable `/api/ml/*`
-answers `503 { code: "ml_unconfigured" }`.
+separately and point `ML_SERVICE_URL` at it — `.dev.vars` locally (gitignored,
+already set for port 8000), a Worker variable in production. Without that
+variable `/api/ml/*` answers `503 { code: "ml_unconfigured" }`.
 
 ```sh
 python -m venv .venv

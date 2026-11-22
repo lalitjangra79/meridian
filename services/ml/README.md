@@ -17,8 +17,9 @@ python -m venv .venv
 python -m uvicorn services.ml.app:app --reload --port 8000
 ```
 
-The Worker picks it up through `ML_SERVICE_URL` (already `http://127.0.0.1:8000`
-in `wrangler.jsonc` for local dev). Start both:
+The Worker picks it up through `ML_SERVICE_URL`. Locally that lives in the
+gitignored `.dev.vars` (`ML_SERVICE_URL=http://127.0.0.1:8000`); in production set
+it as a Worker variable pointing at the deployed service. Start both:
 
 ```sh
 python -m uvicorn services.ml.app:app --port 8000   # terminal 1
