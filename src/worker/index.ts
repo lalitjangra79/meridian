@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { type ModelStage } from '../data'
 
 import { ready } from './db'
+import { forward } from './ml'
 import { findModel, listAgents, listDatasets, listDecisions, listInsights, listModels, listRuns } from './repo'
 
 // The Worker in front of the console. API routes live here; everything else
@@ -14,6 +15,8 @@ import { findModel, listAgents, listDatasets, listDecisions, listInsights, listM
 type Env = {
   ASSETS: Fetcher
   DB?: D1Database
+  /** Base URL of the FastAPI ML engine (services/ml). */
+  ML_SERVICE_URL?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -77,6 +80,12 @@ app.get('/api/runs', async (c) => {
   const { rows, source: from } = await listRuns(c.env.DB)
   return c.json({ runs: rows }, 200, source(from))
 })
+
+/**
+ * The Python half of the API layer: /api/ml/* is forwarded to the FastAPI ML
+ * engine (train, predict, runs, agent actions). See src/worker/ml.ts.
+ */
+app.all('/api/ml/*', (c) => forward(c.req.raw, c.env, c.req.path.replace('/api/ml', '')))
 
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 

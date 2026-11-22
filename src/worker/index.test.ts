@@ -98,6 +98,45 @@ describe('read-only tables', () => {
   })
 })
 
+describe('ML proxy', () => {
+  it('503s with an actionable error when no service is configured', async () => {
+    const res = await get('/api/ml/health')
+    expect(res.status).toBe(503)
+    const body = (await res.json()) as { code: string }
+    expect(body.code).toBe('ml_unconfigured')
+  })
+
+  it('forwards to the ML engine and marks the source', async () => {
+    const original = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe('http://127.0.0.1:8000/health')
+      return new Response(JSON.stringify({ ok: true, service: 'meridian-ml' }), { headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+    try {
+      const res = await app.request('/api/ml/health', {}, { ...env, ML_SERVICE_URL: 'http://127.0.0.1:8000' } as never)
+      expect(res.status).toBe(200)
+      expect(res.headers.get('x-data-source')).toBe('ml')
+      expect(await res.json()).toEqual({ ok: true, service: 'meridian-ml' })
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
+  it('502s when the engine is unreachable', async () => {
+    const original = globalThis.fetch
+    globalThis.fetch = (async () => {
+      throw new Error('connect ECONNREFUSED')
+    }) as typeof fetch
+    try {
+      const res = await app.request('/api/ml/health', {}, { ...env, ML_SERVICE_URL: 'http://127.0.0.1:8000' } as never)
+      expect(res.status).toBe(502)
+      expect((await res.json()) as { code: string }).toMatchObject({ code: 'ml_unreachable' })
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+})
+
 describe('fallbacks', () => {
   it('404s unknown API routes as JSON', async () => {
     const res = await get('/api/nope')

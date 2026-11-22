@@ -1,0 +1,48 @@
+# Meridian local stack: PostgreSQL (persistence), MLflow (experiments) and the
+# FastAPI ML engine. The Worker in front of the console is deployed separately
+# (Freebuff Sites); this file is for the data + ML half of the architecture.
+#
+#   docker compose up --build
+#
+# Then point the Worker at the ML engine:
+#   ML_SERVICE_URL=http://127.0.0.1:8000
+# and the service at PostgreSQL:
+#   DATABASE_URL=postgresql://meridian:meridian@127.0.0.1:5432/meridian
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: meridian
+      POSTGRES_DB: meridian
+    ports: ['5432:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U meridian -d meridian']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.2
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri postgresql+psycopg2://meridian:meridian@postgres:5432/mlflow
+    ports: ['5000:5000']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ml:
+    build: ./services/ml
+    environment:
+      DATABASE_URL: postgresql://meridian:meridian@postgres:5432/meridian
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    ports: ['8000:8000']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

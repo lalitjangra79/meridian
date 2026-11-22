@@ -8,6 +8,7 @@
     "build": "vite build && node scripts/postbuild.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:py": "python -m pytest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

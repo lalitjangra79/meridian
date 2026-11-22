@@ -75,6 +75,44 @@ npm run typecheck
   and seeds the tables on the first request that reaches the API (cached per
   isolate, idempotent, reseeded when `SEED_VERSION` is bumped).
 
+## Architecture
+
+```
+UI (React · Vite · TypeScript)
+        │
+        ▼
+API layer — Worker (Hono, src/worker) ──► /api/ml/* ──► ML engine (FastAPI, services/ml)
+        │                                                        │
+        ▼                                                        ▼
+Data engine — D1 (SQL, migrations/)                    PostgreSQL | SQLite + MLflow
+```
+
+| Layer | Where | What is real |
+| --- | --- | --- |
+| UI | `src/pages`, `src/app` | React console, reads `src/data.ts` |
+| API (Hono) | `src/worker/index.ts` | D1-backed registry routes + proxy to the ML engine |
+| API (FastAPI) | `services/ml/app.py` | Training, scoring, agent tool loop |
+| Data engine | `migrations/`, `src/worker/db.ts` | Schema + seed applied on first request |
+| ML engine | `services/ml/engine.py` | Real gradient-descent training, real loss curve |
+| Agents | `services/ml/agents.py` | Policy-gated, allow-listed tools with an audit log |
+| Persistence | D1 · PostgreSQL/SQLite | API reads from SQL; ML runs and agent actions are stored |
+
+## Python ML engine
+
+The ML engine is a FastAPI service; see `services/ml/README.md`. It is not part of
+the static deploy — Freebuff Sites runs the Worker, not Python — so run it
+separately and point `ML_SERVICE_URL` at it. Without that variable `/api/ml/*`
+answers `503 { code: "ml_unconfigured" }`.
+
+```sh
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r services/ml/requirements.txt
+python -m uvicorn services.ml.app:app --port 8000
+npm run test:py     # 18 pytest tests
+```
+
+`docker compose up` brings up PostgreSQL, MLflow and the ML engine together.
+
 ## Data
 
 The console UI still reads `src/data.ts` directly, so the app runs with no

@@ -6,3 +6,10 @@ dist
 !.dev.vars.example
 .DS_Store
 *.log
+
+# Python services (services/ml)
+.venv
+__pycache__/
+*.pyc
+services/ml/.data/
+.pytest_cache/
