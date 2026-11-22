@@ -949,14 +949,25 @@ export const RUNS: Run[] = [
 /* Weekly indices for the charts (13 weeks, oldest first). */
 export const DECISION_VOLUME = walk(301, 18_400, 13, 1_560, 900, 0).map((n) => Math.round(n))
 export const AUTO_RATE = walk(302, 0.742, 13, 0.0152, 0.009, 3).map((n) => Math.min(0.99, n))
-export const ACCURACY_INDEX = walk(303, 0.909, 13, 0.0043, 0.004, 3).map((n) => Math.min(0.995, n))
+/**
+ * Blended held-out accuracy of the production models, weighted by inference
+ * volume, one value per week (oldest first). Derived from each model's own
+ * `accuracy13` so the index and the registry can never disagree.
+ */
+export const ACCURACY_INDEX = (() => {
+  const live = MODELS.filter((m) => m.stage === 'Production')
+  const volume = live.reduce((sum, m) => sum + m.inferences, 0)
+  return live[0]!.accuracy13.map((_, i) =>
+    Math.round((live.reduce((sum, m) => sum + m.accuracy13[i]! * m.inferences, 0) / volume) * 10_000) / 10_000,
+  )
+})()
 export const VALUE_ROUTED = walk(304, 2_140_000, 13, 172_000, 120_000, 0).map((n) => Math.round(n))
 
 /** Today's totals, seeded so the console is stable between visits. */
 export const TODAY_STATS = {
   decisions: 5_412,
   autoExecuted: 0.924,
-  accuracy: 0.961,
+  accuracy: ACCURACY_INDEX[ACCURACY_INDEX.length - 1]!,
   value: 4_420_000,
   modelsInProduction: MODELS.filter((m) => m.stage === 'Production').length,
   valueYear: 148_000_000,

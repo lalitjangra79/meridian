@@ -8,6 +8,8 @@ act without a person.
 It is a working single-page app with a Cloudflare Worker behind it. Everything
 is seeded, deterministic and local — no accounts, no API keys.
 
+**Live demo:** https://meridian-a5lexs-preview.freebuff.site
+
 ## The six views
 
 - **Command** — today’s decision volume, auto-execution rate, accuracy and value
