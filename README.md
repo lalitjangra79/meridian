@@ -44,6 +44,7 @@ Dependencies are installed with npm and pinned in `package-lock.json`:
 npm install
 npm run dev        # http://localhost:5187 (Vite + the Worker in workerd)
 npm run build      # dist/client (assets) + dist/meridian/index.js (Worker)
+npm run test       # vitest: data, derived metrics, formatting and the API routes
 npm run typecheck
 ```
 
