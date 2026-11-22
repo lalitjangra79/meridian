@@ -17,6 +17,7 @@ import { useToast } from '../components/Toast'
 import { MODELS, modelById, type Run } from '../data'
 import { downloadable } from '../lib/csv'
 import { percent } from '../lib/format'
+import { MlError, trainModel } from '../lib/ml'
 import { useStore } from '../lib/store'
 
 type Queued = { id: string; modelId: string; objective: string; epochs: number; compute: number; progress: number }
@@ -37,25 +38,46 @@ export function Training() {
 
   useEffect(() => () => timers.current.forEach((t) => window.clearInterval(t)), [])
 
-  const start = () => {
-    const id = `run-${Math.floor(2400 + Math.random() * 500)}`
-    const job: Queued = { id, modelId, objective: objective.trim() || 'Refresh', epochs, compute, progress: 6 }
+  const start = async () => {
+    const jobId = `queue-${Date.now().toString().slice(-6)}`
+    const job: Queued = { id: jobId, modelId, objective: objective.trim() || 'Refresh', epochs, compute, progress: 8 }
     setQueued((q) => [...q, job])
     setOpen(false)
-    toast.show({ tone: 'info', title: `${id} queued`, body: `${modelById(modelId)?.name} · ${epochs} epochs on ${compute} GPU-h` })
+    toast.show({ tone: 'info', title: 'Run sent to the ML engine', body: `${modelById(modelId)?.name} · ${epochs} epochs on ${compute} GPU-h` })
 
-    const started = Date.now()
+    // The bar creeps while the request is open; the run finishes when the engine
+    // answers, never on a clock.
     const timer = window.setInterval(() => {
-      const progress = Math.min(100, ((Date.now() - started) / 4600) * 100)
-      setQueued((q) => q.map((x) => (x.id === id ? { ...x, progress } : x)))
-      if (progress >= 100) {
-        window.clearInterval(timer)
-        const run = launchRun({ modelId, objective: job.objective, epochs, compute })
-        setQueued((q) => q.filter((x) => x.id !== id))
-        toast.show({ tone: 'success', title: `${run.id} succeeded`, body: `${modelById(modelId)?.name} · ${percent(run.accuracy)} held-out accuracy` })
-      }
-    }, 320)
+      setQueued((q) => q.map((x) => (x.id === jobId ? { ...x, progress: Math.min(92, x.progress + 5) } : x)))
+    }, 400)
     timers.current.push(timer)
+
+    try {
+      const result = await trainModel({ modelId, objective: job.objective, epochs })
+      window.clearInterval(timer)
+      const run = launchRun({
+        modelId,
+        objective: job.objective,
+        epochs,
+        compute,
+        result: { id: result.run.id, accuracy: result.run.accuracy, loss: result.run.loss, samples: result.run.samples },
+      })
+      setQueued((q) => q.filter((x) => x.id !== jobId))
+      toast.show({
+        tone: 'success',
+        title: `${run.id} trained`,
+        body: `${modelById(modelId)?.name} · ${percent(run.accuracy)} held-out on ${result.run.samples.toLocaleString('en-US')} rows`,
+      })
+    } catch (err) {
+      window.clearInterval(timer)
+      setQueued((q) => q.filter((x) => x.id !== jobId))
+      const unconfigured = err instanceof MlError && err.code === 'ml_unconfigured'
+      toast.show({
+        tone: 'error',
+        title: unconfigured ? 'ML engine not configured' : 'Training failed',
+        body: unconfigured ? 'Start services/ml and set ML_SERVICE_URL, then queue the run again.' : err instanceof Error ? err.message : 'The ML engine could not be reached.',
+      })
+    }
   }
 
   const succeeded = runs.filter((r) => r.status === 'Succeeded')
@@ -126,7 +148,7 @@ export function Training() {
                 <li key={j.id} className="grid gap-x-6 gap-y-2 py-4 sm:grid-cols-[minmax(0,1fr)_220px_70px] sm:items-center">
                   <div className="min-w-0">
                     <p className="text-[14px]">
-                      {j.id} <span className="text-muted">·</span> {modelById(j.modelId)?.name}
+                      {modelById(j.modelId)?.name} <span className="text-muted">·</span> {j.epochs} epochs
                     </p>
                     <p className="mt-1 text-[12px] text-muted">{j.objective}</p>
                   </div>
@@ -157,13 +179,15 @@ export function Training() {
           enterDelay={120}
         />
       </div>
-      <p className="mt-4 text-[12px] text-muted">Select a run for its loss curve, artifact and promotion controls. Runs launched here are simulated in the browser.</p>
+      <p className="mt-4 text-[12px] text-muted">
+        Select a run for its loss curve, artifact and promotion controls. Runs launched here are trained by the ML engine (<span className="font-mono">services/ml</span>), which also stores the run and its weights.
+      </p>
 
       <Overlay open={open} onClose={() => setOpen(false)} label="Queue a training run" kind="modal" className="max-w-[560px]">
         <div className="px-6 pt-8 pb-8 sm:px-9">
           <p className="caps text-[10px] tracking-[0.22em] text-muted">Training</p>
           <h2 className="mt-2 pr-8 font-serif text-[27px] leading-tight">Queue a run</h2>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-muted">The artifact lands in the registry as a candidate. Promotion still needs a human decision.</p>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-muted">The run trains in the ML engine, its accuracy and loss curve come back from that training, and the artifact lands in the registry as a candidate. Promotion still needs a human decision.</p>
 
           <Select
             label="Model"

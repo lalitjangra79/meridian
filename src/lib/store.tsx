@@ -38,7 +38,14 @@ export const DEFAULT_SETTINGS: Settings = { confidenceFloor: 0.9, approvalLimit:
 
 export type LiveAgent = Agent & { autonomy: AutonomyLevel; paused: boolean }
 
-type LaunchInput = { modelId: string; objective: string; epochs: number; compute: number }
+type LaunchInput = {
+  modelId: string
+  objective: string
+  epochs: number
+  compute: number
+  /** Real evaluation evidence from the ML engine, when the run was trained there. */
+  result?: { id: string; accuracy: number; loss: number[]; samples: number }
+}
 
 type Store = {
   models: Model[]
@@ -110,7 +117,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const launchRun = useCallback(
     (input: LaunchInput) => {
       const model = MODELS.find((m) => m.id === input.modelId) ?? MODELS[0]!
-      const id = `run-${Date.now().toString().slice(-5)}`
+      // A run trained by the ML engine carries its own id, accuracy and loss
+      // curve; nothing here invents them.
+      const id = input.result?.id ?? `run-${Date.now().toString().slice(-5)}`
       const run: Run = {
         id,
         modelId: model.id,
@@ -121,10 +130,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         epochs: input.epochs,
         compute: input.compute,
         cost: Math.round(input.compute * 80),
-        accuracy: Math.min(0.999, Math.round((model.accuracy + (input.epochs > 80 ? 0.004 : 0.001)) * 1000) / 1000),
+        accuracy: input.result ? input.result.accuracy : Math.min(0.999, Math.round((model.accuracy + (input.epochs > 80 ? 0.004 : 0.001)) * 1000) / 1000),
         owner: 'You',
-        commit: Math.random().toString(16).slice(2, 9),
-        loss: lossCurve(Date.now() % 9973, 26, 1.9, 0.2),
+        commit: input.result ? `${input.result.samples} rows` : Math.random().toString(16).slice(2, 9),
+        loss: input.result ? input.result.loss : lossCurve(Date.now() % 9973, 26, 1.9, 0.2),
       }
       setLaunched((list) => [run, ...list])
       return run
