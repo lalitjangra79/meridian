@@ -66,11 +66,31 @@ npm run typecheck
   Inter), with a light theme. Motion respects `prefers-reduced-motion`.
 - `src/worker/index.ts` — Hono Worker: `GET /api/models[?stage=]`,
   `GET /api/models/:id`, `GET /api/agents`, `GET /api/decisions[?outcome=]`,
-  `GET /api/health`, then static assets in SPA mode.
+  `GET /api/datasets`, `GET /api/insights`, `GET /api/runs`, `GET /api/health`,
+  then static assets in SPA mode.
+- `src/worker/repo.ts` — the API's read model. With a `DB` binding it queries D1;
+  without one (unit tests, a bare Worker) it serves the seed arrays, so the shape
+  never changes. Responses carry `x-data-source: d1 | seed`.
+- `src/worker/db.ts` + `migrations/0001_init.sql` — the Worker applies the schema
+  and seeds the tables on the first request that reaches the API (cached per
+  isolate, idempotent, reseeded when `SEED_VERSION` is bumped).
+
+## Data
+
+The console UI still reads `src/data.ts` directly, so the app runs with no
+backend. The API is the storage path: on first request it creates the D1 tables
+(`models`, `agents`, `decisions`, `datasets`, `insights`, `runs`, `meta`) and
+seeds them from the same checked-in data.
+
+Local development uses a local D1 database created by the Vite plugin under
+`.wrangler/state`. In production the `DB` binding comes from Freebuff Sites
+(Sites → Storage, D1, binding `DB`). Apply the schema out of band, if you prefer,
+with `npx wrangler d1 migrations apply meridian --local` / `--remote`.
 
 Keyboard: `g c/m/t/d/a/g` to move, `/` to search models, `t` theme, `?` help.
 
 ## Deploy with Freebuff Sites
 
 `deploy.json` points at the build output. After `npm run build`, deploy with the
-`sites_deploy` tool.
+`sites_deploy` tool. Add the D1 database (binding `DB`) in Sites → Storage before
+the first deploy that needs the API; the Worker creates and seeds its own schema.

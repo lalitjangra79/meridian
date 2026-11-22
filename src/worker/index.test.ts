@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { AGENTS, DECISIONS, MODELS } from '../data'
+import { AGENTS, DATASETS, DECISIONS, INSIGHTS, MODELS, RUNS } from '../data'
 import app from './index'
 
-/** Minimal stand-in for the static-asset binding. */
+/** Static-asset binding stand-in. No `DB`: these tests exercise the seed path. */
 const env = {
   ASSETS: {
     fetch: async (request: Request) => new Response(`asset:${new URL(request.url).pathname}`, { headers: { 'content-type': 'text/html' } }),
@@ -13,10 +13,10 @@ const env = {
 const get = (path: string) => app.request(path, {}, env as never)
 
 describe('GET /api/health', () => {
-  it('answers ok', async () => {
+  it('answers ok and names the storage path', async () => {
     const res = await get('/api/health')
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ ok: true, service: 'meridian-console' })
+    expect(await res.json()).toEqual({ ok: true, service: 'meridian-console', storage: 'seed' })
   })
 })
 
@@ -26,6 +26,7 @@ describe('GET /api/models', () => {
     const body = (await res.json()) as { models: { id: string }[] }
     expect(res.status).toBe(200)
     expect(body.models).toHaveLength(MODELS.length)
+    expect(res.headers.get('x-data-source')).toBe('seed')
   })
 
   it('filters by stage', async () => {
@@ -76,6 +77,24 @@ describe('GET /api/decisions', () => {
     const body = (await (await get('/api/decisions?outcome=awaiting approval')).json()) as { decisions: { outcome: string }[] }
     expect(body.decisions.length).toBeGreaterThan(0)
     expect(body.decisions.every((d) => d.outcome === 'Awaiting approval')).toBe(true)
+  })
+})
+
+describe('read-only tables', () => {
+  it('serves the data estate', async () => {
+    const body = (await (await get('/api/datasets')).json()) as { datasets: unknown[] }
+    expect(body.datasets).toHaveLength(DATASETS.length)
+  })
+
+  it('serves training runs', async () => {
+    const body = (await (await get('/api/runs')).json()) as { runs: { commit: string }[] }
+    expect(body.runs).toHaveLength(RUNS.length)
+    expect(body.runs[0]).toHaveProperty('commit')
+  })
+
+  it('serves the signals', async () => {
+    const body = (await (await get('/api/insights')).json()) as { insights: unknown[] }
+    expect(body.insights).toHaveLength(INSIGHTS.length)
   })
 })
 
