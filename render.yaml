@@ -1,0 +1,36 @@
+# Render Blueprint for the Meridian ML engine + a managed PostgreSQL.
+#
+# Render → New → Blueprint → pick this repo. Render reads this file, builds
+# services/ml/Dockerfile, creates the database and wires DATABASE_URL. It also
+# generates ML_SERVICE_TOKEN: copy its value and the service URL into the Worker
+# (Sites → Secrets: ML_SERVICE_URL, ML_SERVICE_TOKEN) so the console can train.
+#
+# Note: the free web instance sleeps when idle, so the first training request
+# after a quiet period can take ~30-50s (the Worker's timeout is 25s → the UI
+# reports ml_unreachable). Use a paid instance or keep it warm for a real demo.
+
+services:
+  - type: web
+    name: meridian-ml
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./services/ml/Dockerfile
+    dockerContext: ./services/ml
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: meridian-db
+          property: connectionString
+      - key: ML_SERVICE_TOKEN
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false # optional: leave unset to keep the deterministic policy planner
+
+databases:
+  - name: meridian-db
+    plan: free
+    databaseName: meridian
+    user: meridian

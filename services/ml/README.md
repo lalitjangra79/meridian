@@ -65,8 +65,19 @@ between the same tools; without a key the deterministic policy planner runs
 (`planner: "policy"`). The LLM path is not covered by the tests in this repo —
 no key is configured, so it has not been exercised.
 
+## Token gate
+
+Set `ML_SERVICE_TOKEN` on a publicly hosted deployment: `/health` stays open, every
+other route requires `Authorization: Bearer <token>` (401 otherwise). The Worker
+sends it when `ML_SERVICE_TOKEN` is set on its side too.
+
+## Deploy
+
+`render.yaml` (Render Blueprint), `fly.toml` (Fly) and `docker-compose.yml` (VPS)
+all build this Dockerfile. Steps and the Worker wiring: [../../DEPLOY.md](../../DEPLOY.md).
+
 ## Tests
 
 ```sh
-python -m pytest            # 18 tests: engine, policy, API, persistence
+python -m pytest            # 19 tests: engine, policy, API, persistence, token gate
 ```

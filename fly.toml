@@ -1,0 +1,37 @@
+# Fly.io config for the Meridian ML engine.
+#
+#   fly launch --no-deploy --dockerfile services/ml/Dockerfile --name meridian-ml
+#   fly postgres create --name meridian-db          # gives you a DATABASE_URL
+#   fly postgres attach meridian-db                 # writes DATABASE_URL as a secret
+#   fly secrets set ML_SERVICE_TOKEN=...            # same value the Worker sends
+#   fly deploy
+#
+# Then set ML_SERVICE_URL=https://<app>.fly.dev (+ ML_SERVICE_TOKEN) on the Worker.
+
+app = "meridian-ml"
+primary_region = "sin"
+
+[build]
+  dockerfile = "services/ml/Dockerfile"
+
+[env]
+  PORT = "8000"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

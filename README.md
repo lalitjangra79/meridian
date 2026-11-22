@@ -113,6 +113,8 @@ npm run test:py     # 18 pytest tests
 ```
 
 `docker compose up` brings up PostgreSQL, MLflow and the ML engine together.
+Hosting it (Render Blueprint, Fly, VPS) and wiring `ML_SERVICE_URL` +
+`ML_SERVICE_TOKEN` into the deployed Worker is covered in [DEPLOY.md](DEPLOY.md).
 
 ## Data
 

@@ -6,7 +6,11 @@
 // http://127.0.0.1:8000. Without it the routes answer 503 with an actionable
 // message instead of pretending to train.
 
-export type MlEnv = { ML_SERVICE_URL?: string }
+export type MlEnv = {
+  ML_SERVICE_URL?: string
+  /** Optional shared secret; sent as a bearer token to a public ML service. */
+  ML_SERVICE_TOKEN?: string
+}
 
 const TIMEOUT_MS = 25_000
 
@@ -27,6 +31,7 @@ export async function forward(request: Request, env: MlEnv, path: string): Promi
   const headers: Record<string, string> = { accept: 'application/json' }
   const contentType = request.headers.get('content-type')
   if (contentType) headers['content-type'] = contentType
+  if (env.ML_SERVICE_TOKEN) headers.authorization = `Bearer ${env.ML_SERVICE_TOKEN}`
 
   const init: RequestInit = { method: request.method, headers, signal: AbortSignal.timeout(TIMEOUT_MS) }
   if (request.method !== 'GET' && request.method !== 'HEAD') init.body = await request.text()

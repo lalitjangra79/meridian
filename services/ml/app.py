@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .agents import Observation, act
@@ -59,6 +59,19 @@ class ActRequest(BaseModel):
     useLlm: bool = False
 
 
+def require_token(authorization: str | None = Header(default=None)) -> None:
+    """Shared-secret gate for a publicly hosted service.
+
+    Active only when ML_SERVICE_TOKEN is set; the Worker sends the same value as
+    `Authorization: Bearer …`. /health stays open so a host can probe the service.
+    """
+    expected = os.environ.get("ML_SERVICE_TOKEN")
+    if not expected:
+        return
+    if authorization != f"Bearer {expected}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @app.get("/health")
 def health() -> dict:
     return {
@@ -69,7 +82,7 @@ def health() -> dict:
     }
 
 
-@app.post("/train")
+@app.post("/train", dependencies=[Depends(require_token)])
 def post_train(request: TrainRequest) -> dict:
     try:
         result = train(
@@ -85,12 +98,12 @@ def post_train(request: TrainRequest) -> dict:
     return {"run": run, "model": {"weights": result["weights"], "bias": result["bias"]}}
 
 
-@app.get("/runs")
+@app.get("/runs", dependencies=[Depends(require_token)])
 def get_runs(limit: int = 20) -> dict:
     return {"runs": store().list_runs(max(1, min(limit, 100)))}
 
 
-@app.get("/runs/{run_id}")
+@app.get("/runs/{run_id}", dependencies=[Depends(require_token)])
 def get_run(run_id: str) -> dict:
     run = store().get_run(run_id)
     if run is None:
@@ -98,7 +111,7 @@ def get_run(run_id: str) -> dict:
     return {"run": run}
 
 
-@app.post("/predict")
+@app.post("/predict", dependencies=[Depends(require_token)])
 def post_predict(request: PredictRequest) -> dict:
     run = next((r for r in store().list_runs(100) if r["model_id"] == request.modelId), None)
     if run is None:
@@ -110,7 +123,7 @@ def post_predict(request: PredictRequest) -> dict:
     return {"modelId": request.modelId, "runId": run["id"], "predictions": rows}
 
 
-@app.post("/agents/act")
+@app.post("/agents/act", dependencies=[Depends(require_token)])
 def post_act(request: ActRequest) -> dict:
     observation = Observation(
         model_id=request.modelId,
@@ -124,7 +137,7 @@ def post_act(request: ActRequest) -> dict:
     return act(store(), observation, use_llm=request.useLlm)
 
 
-@app.get("/agents/actions")
+@app.get("/agents/actions", dependencies=[Depends(require_token)])
 def get_actions(limit: int = 50) -> dict:
     return {"actions": store().list_actions(max(1, min(limit, 200)))}
 

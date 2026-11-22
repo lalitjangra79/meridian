@@ -54,6 +54,16 @@ def test_predict_without_a_model_is_a_404(client):
     assert client.post("/predict", json={"modelId": "mdl-none", "rows": [[1.0]]}).status_code == 404
 
 
+def test_token_is_enforced_only_when_configured(client, monkeypatch):
+    assert client.get("/runs").status_code == 200
+    monkeypatch.setenv("ML_SERVICE_TOKEN", "s3cret")
+    assert client.get("/runs").status_code == 401
+    assert client.get("/runs", headers={"authorization": "Bearer wrong"}).status_code == 401
+    assert client.get("/runs", headers={"authorization": "Bearer s3cret"}).status_code == 200
+    # A host must be able to probe health without the secret.
+    assert client.get("/health").status_code == 200
+
+
 def test_agents_act_records_executed_tools(client):
     body = client.post(
         "/agents/act",

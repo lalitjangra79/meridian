@@ -122,6 +122,26 @@ describe('ML proxy', () => {
     }
   })
 
+  it('sends the shared secret as a bearer token when configured', async () => {
+    const original = globalThis.fetch
+    let auth: string | null = null
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      auth = new Headers(init?.headers).get('authorization')
+      return Response.json({ ok: true })
+    }) as typeof fetch
+    try {
+      const res = await app.request(
+        '/api/ml/runs',
+        {},
+        { ...env, ML_SERVICE_URL: 'https://ml.example.com', ML_SERVICE_TOKEN: 's3cret' } as never,
+      )
+      expect(res.status).toBe(200)
+      expect(auth).toBe('Bearer s3cret')
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+
   it('502s when the engine is unreachable', async () => {
     const original = globalThis.fetch
     globalThis.fetch = (async () => {

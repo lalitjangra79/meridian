@@ -17,6 +17,8 @@ type Env = {
   DB?: D1Database
   /** Base URL of the FastAPI ML engine (services/ml). */
   ML_SERVICE_URL?: string
+  /** Shared secret for a publicly hosted ML engine. */
+  ML_SERVICE_TOKEN?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()
